@@ -13,7 +13,7 @@ using VRage.Collections;
 using VRage.Game.ObjectBuilders.Definitions;
 using VRage.Game.ModAPI.Ingame;
 using SpaceEngineers.Game.ModAPI.Ingame;
-namespace SolarTrackerRotor
+namespace SolarTrackerRotors
 {
     public sealed class Program : MyGridProgram
     {
@@ -31,8 +31,8 @@ namespace SolarTrackerRotor
         ******************************************************************************/
 
 
-        float solarPanelMaxOutput = 0.04f; // 0.04 for small grid, 0.12 for large grid
-        float rollSpeedLimit = 2.0f;
+        float solarPanelMaxOutput = 0.16f; // 0.04 for small grid, 0.16 for large grid
+        float rollSpeedLimit = 1.0f;
         float rotorRollSolarPowerMultiplier = 100;
         float rotorYawPitchMultiplier = 5;
         Vector3D vectorToPolar = new Vector3D(0, -1, 0);
@@ -47,9 +47,9 @@ namespace SolarTrackerRotor
         void MyEcho(string text, bool append = false)
         {
             Echo(text);
-            if ( textPanel != null )
+            if (textPanel != null)
             {
-                textPanel.WriteText("\n"+text, append);
+                textPanel.WriteText("\n" + text, append);
             }
         }
 
@@ -70,6 +70,7 @@ namespace SolarTrackerRotor
 
         public void Main(string argument)
         {
+            Echo(textPanel.ToString());
             switch (argument)
             {
                 case "Start":
@@ -77,6 +78,7 @@ namespace SolarTrackerRotor
                         Runtime.UpdateFrequency = UpdateFrequency.Update10;
                         MyEcho("Solar tracker is running");
                         TrackSunRotor(getSolTrackingVector());
+                        solarTrackerStatus = "Start";
                         break;
                     }
                 case "Stop":
@@ -84,13 +86,17 @@ namespace SolarTrackerRotor
                         Runtime.UpdateFrequency = UpdateFrequency.None;
                         MyEcho("Solar tracker is stopped");
                         StopRotors();
+                        solarTrackerStatus = "Stop";
                         break;
                     }
 
                 default:
-                    if ( solarTrackerStatus == null || solarTrackerStatus == "Stop" ) {
+                    if (solarTrackerStatus == null || solarTrackerStatus == "Stop")
+                    {
                         MyEcho("Solar tracker is stopped");
-                    } else {
+                    }
+                    else
+                    {
                         MyEcho("Solar tracker is running");
                     }
                     TrackSunRotor(getSolTrackingVector());
@@ -105,7 +111,6 @@ namespace SolarTrackerRotor
         Vector3D getSolTrackingVector()
         {
             cnt++;
-            Echo(cnt.ToString());
             Vector3D vectorLeft = CamPolar.WorldMatrix.Left;
             Vector3D vectorUp = CamPolar.WorldMatrix.Up;
             Vector3D vectorForward = CamPolar.WorldMatrix.Forward;
@@ -113,32 +118,37 @@ namespace SolarTrackerRotor
                    "\n  X: " + Math.Round(vectorForward.X, 5) +
                    "\n  Y: " + Math.Round(vectorForward.X, 5) +
                    "\n  Z: " + Math.Round(vectorForward.X, 5),
-                   true );
-            double targetYaw   = -(float)vectorToPolar.Dot(vectorLeft) * rotorYawPitchMultiplier;
-            double targetPitch = -(float)vectorToPolar.Dot(vectorUp)   * rotorYawPitchMultiplier;
+                   true);
+            double targetYaw = -(float)vectorToPolar.Dot(vectorLeft) * rotorYawPitchMultiplier;
+            double targetPitch = -(float)vectorToPolar.Dot(vectorUp) * rotorYawPitchMultiplier;
             double targetRoll = 0;
             if (Math.Abs(targetPitch) + Math.Abs(targetYaw) < 0.05f)
             {
-                MyEcho("Tracker: Roll");
+                MyEcho("Tracker: Roll", true);
                 if (cnt >= 20)
                 {
                     float OutputGain = solarPanel.MaxOutput - SolarOutput;
                     if (OutputGain < 0)
                         dir *= -1;
                     SolarOutput = solarPanel.MaxOutput;
+                    if (solarPanelMaxOutput < SolarOutput)
+                        solarPanelMaxOutput = SolarOutput;
                     cnt = 0;
                 }
                 targetRoll = (float)(dir * (solarPanelMaxOutput - solarPanel.MaxOutput) * rotorRollSolarPowerMultiplier);
                 targetRoll = Math.Min(Math.Max(targetRoll, -rollSpeedLimit), rollSpeedLimit);
-            } else {
-                MyEcho("Tracker: Yaw/Pitch");
             }
-            MyEcho("Navigation vector:" + 
+            else
+            {
+                MyEcho("Tracker: Yaw/Pitch", true);
+            }
+            MyEcho("Navigation vector:" +
                  "\n    Yaw: " + Math.Round(targetYaw, 5) +
                  "\n  Pitch: " + Math.Round(targetPitch, 5) +
-                 "\n   Roll: " + Math.Round(targetYaw, 5));
-            MyEcho("Solar output: " + Math.Round(SolarOutput, 5));
-            return new Vector3D(targetYaw, -targetPitch, 0);
+                 "\n   Roll: " + Math.Round(targetYaw, 5),
+                 true);
+            MyEcho("Solar output: " + Math.Round(SolarOutput, 5), true);
+            return new Vector3D(targetYaw, -targetPitch, targetRoll);
         }
         void TrackSunRotor(Vector3D target)
         {
